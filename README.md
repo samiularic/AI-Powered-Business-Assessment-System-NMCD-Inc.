@@ -23,13 +23,27 @@ No manual review. No delay. The entire pipeline runs automatically from form sub
 
 ---
 
+## How It Was Built
+
+I built the first working version of the intelligence layer by connecting GoHighLevel, Make.com, the OpenAI API, and Gmail as separate components. Each tool handled one part of the pipeline and passed data to the next.
+
+After the first version was working and tested, I researched the architecture further. I identified redundant handoffs between components and rebuilt the entire system to consolidate all processing inside a single Make.com scenario. This reduced the number of failure points, simplified troubleshooting, and made the pipeline significantly easier to maintain.
+
+I presented the refined system to the project sponsor. She reviewed the architecture and approved it.
+
+After consolidating the intelligence layer, I researched whether the full assessment infrastructure could also be built inside one platform. I confirmed it could. I then built the AI Business Assessment system inside GHL, connecting the form, workflow triggers, pipeline logic, and webhook into a single cohesive flow. After validating that system end to end, I applied the same approach to build the Financial Readiness Scorecard system with its own fields, scoring logic, and output requirements.
+
+---
+
 ## Architecture
+
+### Version 1: Initial Build (Make.com)
 
 ```
 GHL Survey Submission
         |
         v
-GHL Workflow (W2) -- Webhook Trigger
+GHL Workflow -- Webhook Trigger
         |
         v
 Make.com Scenario
@@ -37,15 +51,37 @@ Make.com Scenario
         |-- Module 1: Custom Webhook (receives GHL payload)
         |
         |-- Module 2: OpenAI Generate a Completion (gpt-4o-mini)
+        |              Prompt receives parsed survey field values
+        |              Returns personalized Business Readiness Report
         |
-        |-- Module 3: Gmail Send an Email (delivers report)
+        |-- Module 3: Gmail Send an Email
+                       Delivers report to founder's email address
 ```
 
-The architecture consolidates the full pipeline inside a single Make.com scenario. An earlier version distributed logic across separate tools. After further research, I rebuilt it into one unified flow, which reduced complexity and made the system easier to maintain and debug.
+### Version 2: Consolidated Build (GHL)
+
+After research, I rebuilt the system to run entirely inside GHL. This version powers both the AI Business Assessment and the Financial Readiness Scorecard.
+
+```
+GHL Survey Submission (AI Business Assessment or Financial Readiness Form)
+        |
+        v
+GHL Workflow -- Trigger
+        |
+        |-- Scoring / Report Logic
+        |    AI Business Assessment: generates qualitative readiness report
+        |    Financial Readiness Scorecard: applies Futurpreneur weighted scoring
+        |
+        v
+GHL Email Action
+        Delivers output to founder's email address
+```
 
 ---
 
 ## Tech Stack
+
+### Version 1
 
 | Layer | Tool |
 |---|---|
@@ -54,6 +90,39 @@ The architecture consolidates the full pipeline inside a single Make.com scenari
 | AI report generation | OpenAI API (gpt-4o-mini) |
 | Email delivery | Gmail via Make.com |
 | Fallback automation | Zapier (evaluated, not deployed) |
+
+### Version 2
+
+| Layer | Tool |
+|---|---|
+| CRM, workflow automation, scoring, and email delivery | GoHighLevel (GHL) |
+
+---
+
+## What I Built
+
+### Version 1: Make.com Intelligence Layer
+
+I built the initial AI pipeline using Make.com as the processing layer between GHL and OpenAI.
+
+**Module 1 - Custom Webhook**
+Receives the GHL webhook payload. Parses survey Unique Keys and maps values to named variables for downstream use.
+
+**Module 2 - OpenAI Generate a Completion**
+Calls gpt-4o-mini with a structured prompt that includes the parsed survey values. Returns the full Business Readiness Report as a text completion.
+
+**Module 3 - Gmail Send an Email**
+Sends the generated report to the founder's email address pulled from the GHL contact record.
+
+### Version 2: Consolidated GHL System
+
+After researching whether the full pipeline could run inside one platform, I confirmed it could and rebuilt everything inside GHL. This version covers two assessments:
+
+**AI Business Assessment**
+Built the form, workflow trigger, report logic, and email delivery entirely inside GHL. The system processes survey responses and delivers a personalized Business Readiness Report to each founder on submission.
+
+**Financial Readiness Scorecard**
+Built the form, workflow trigger, scoring logic based on the Futurpreneur weighted framework, and email delivery inside GHL. The system scores each founder's financial readiness and delivers the result directly to their inbox.
 
 ---
 
@@ -69,51 +138,13 @@ The OpenAI module uses a structured prompt that receives survey field values and
 
 ### Scoring logic architecture
 
-I evaluated using GHL native If/Else branching for the Funding Readiness Scorecard scoring logic. GHL If/Else creates separate END nodes with no merge point, which makes multi-variable weighted scoring impractical inside the workflow builder. The correct architecture routes scoring calculations to Make.com, where logic can be applied across all variables before returning a result.
+I evaluated using GHL native If/Else branching for the Funding Readiness Scorecard scoring logic. GHL If/Else creates separate END nodes with no merge point, which makes multi-variable weighted scoring impractical inside the workflow builder. The correct architecture routes scoring calculations to Make.com, where logic can be applied across all variables before returning a single result.
 
 The scoring model is based on the Futurpreneur weighted scoring framework, adapted for this system.
 
 ### Platform consolidation
 
-The first working version of the intelligence layer used GHL, Make.com, and the OpenAI API as loosely connected components. After reviewing the architecture, I identified redundant handoffs and rebuilt the pipeline to consolidate all processing inside a single Make.com scenario. This reduced the number of failure points and made the system significantly easier to troubleshoot.
-
----
-
-## GHL Workflow Configuration
-
-**Workflow name:** W2 - AI Business Assessment Completion Processing
-
-**Trigger:** Diagnostic survey submission
-
-**Actions:**
-- Apply assessment tags to contact
-- Fire webhook to Make.com with survey field values as payload
-- Make.com handles all downstream processing and report delivery
-
----
-
-## Make.com Scenario Configuration
-
-**Module 1 - Custom Webhook**
-Receives the GHL webhook payload. Parses survey Unique Keys and maps values to named variables for downstream use.
-
-**Module 2 - OpenAI Generate a Completion**
-Calls gpt-4o-mini with a structured prompt that includes the parsed survey values. Returns the full Business Readiness Report as a text completion.
-
-**Module 3 - Gmail Send an Email**
-Sends the generated report to the founder's email address, pulled from the GHL contact record included in the webhook payload.
-
----
-
-## Assessment Forms
-
-Two diagnostic forms power the system:
-
-**AI Business Assessment**
-Evaluates founder readiness across business planning, market understanding, operational capacity, and investor preparedness. Question logic and field structure were designed to produce survey payloads that the AI model can interpret accurately.
-
-**Funding Readiness Scorecard**
-Scores founders against a weighted rubric based on the Futurpreneur framework. Scoring logic runs externally in Make.com rather than inside GHL workflows.
+The first working version used GHL, Make.com, and the OpenAI API as loosely connected components. After reviewing the architecture, I identified redundant handoffs and rebuilt the pipeline to consolidate all processing inside a single Make.com scenario. This reduced failure points and made the system significantly easier to troubleshoot and extend.
 
 ---
 
@@ -135,7 +166,7 @@ This document was produced for operational handoff and long-term system maintain
 
 Technical Support and Applied Research Lead
 
-Responsible for the full AI Intelligence Layer: system architecture, GHL workflow configuration, Make.com scenario build, OpenAI API integration, prompt engineering, scoring logic design, and technical documentation.
+Responsible for the AI intelligence layer, Make.com scenario build, OpenAI API integration, prompt engineering, Financial Readiness Scorecard system build, scoring logic design, and technical documentation.
 
 ---
 
